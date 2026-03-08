@@ -1,0 +1,63 @@
+# =============================================================================
+# CRE Market Intelligence Platform — dbt Project Configuration
+#
+# This file is the entry point for dbt. It defines:
+#   - Which database schemas each model layer writes to
+#   - Materialization strategy per layer
+#   - Project-level variables
+#
+# MEDALLION ARCHITECTURE:
+#   bronze  → raw source data (managed by Mage, not dbt)
+#   silver  → cleaned, typed, validated (dbt staging + silver models)
+#   gold    → investment-grade aggregations (dbt gold models)
+# =============================================================================
+
+name: cre_platform
+version: "1.0.0"
+config-version: 2
+
+profile: cre_platform  # Must match the profile name in profiles.yml
+
+# File path configs — dbt standard
+model-paths:      ["models"]
+analysis-paths:   ["analyses"]
+test-paths:       ["tests"]
+seed-paths:       ["seeds"]
+macro-paths:      ["macros"]
+snapshot-paths:   ["snapshots"]
+
+target-path:  "target"
+clean-targets: ["target", "dbt_packages"]
+
+# =============================================================================
+# MODEL CONFIGURATIONS
+# Each layer gets its own schema and materialization strategy.
+# =============================================================================
+
+models:
+  cre_platform:
+
+    silver:
+      # Silver = cleaned, typed, validated data
+      # Tables persist so Gold models don't re-run cleaning every time
+      +materialized: table
+      +schema: silver
+      +tags: ["silver"]
+
+    gold:
+      # Gold = investment-grade aggregations for analysts
+      # Tables persist for fast query performance
+      +materialized: table
+      +schema: gold
+      +tags: ["gold"]
+
+# =============================================================================
+# PROJECT VARIABLES
+# Reference in SQL with: {{ var('variable_name') }}
+# =============================================================================
+
+vars:
+  bronze_schema:  "bronze"
+  silver_schema:  "silver"
+  gold_schema:    "gold"
+  source_table:   "australian_rentals"

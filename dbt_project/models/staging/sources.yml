@@ -1,0 +1,71 @@
+version: 2
+
+sources:
+  - name: bronze
+    description: Raw rental data ingested by Mage.ai pipeline.
+    schema: bronze
+    database: cre_db
+
+    freshness:
+      warn_after:  {count: 25, period: hour}
+      error_after: {count: 48, period: hour}
+    loaded_at_field: _ingested_at
+
+    tables:
+      - name: australian_rentals
+        description: >
+          Raw Australian rental market listings for 2026.
+          6,767 rows with property details, pricing, location,
+          and Mage audit columns.
+
+        columns:
+          - name: price_display_raw
+            description: Raw price string e.g. '1200'. Silver parses to NUMERIC.
+
+          - name: property_type
+            description: Property type e.g. house, apartment, unit, townhouse
+
+          - name: locality
+            description: Suburb/locality name. Non-nullable.
+
+          - name: state
+            description: Australian state abbreviation e.g. NSW, VIC, QLD
+
+          - name: postcode
+            description: Australian postcode stored as TEXT
+
+          - name: bedrooms_raw
+            description: Raw bedroom count string. Silver casts to INTEGER.
+
+          - name: bathrooms_raw
+            description: Raw bathroom count string. Silver casts to INTEGER.
+
+          - name: parking_raw
+            description: Raw parking spaces string. Silver casts to INTEGER.
+
+          - name: amenities_raw
+            description: Comma-separated amenities list
+
+          - name: description_raw
+            description: Full property description with HTML removed
+
+          - name: listed_date_raw
+            description: Raw listing date string. Silver casts to DATE.
+
+          - name: agency_name
+            description: Real estate agency name
+
+          - name: source_url
+            description: Original listing URL
+
+          - name: _ingested_at
+            description: UTC timestamp when row was loaded by Mage
+
+          - name: _source_file
+            description: Source CSV filename
+
+          - name: _pipeline_run_id
+            description: Mage pipeline run UUID
+
+          - name: _dq_warnings
+            description: Pipe-separated data quality warnings

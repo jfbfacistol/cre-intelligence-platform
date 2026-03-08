@@ -1,0 +1,134 @@
+version: 2
+
+models:
+  - name: stg_rentals
+    description: >
+      Cleaned and type-cast rental data from Bronze.
+      Prices are NUMERIC, bedrooms/bathrooms are INTEGER,
+      dates are DATE, and audit columns are preserved.
+
+    columns:
+      - name: _pipeline_run_id
+        description: Mage pipeline run UUID
+        tests:
+          - not_null
+
+      - name: _ingested_at
+        description: UTC timestamp when row was ingested
+        tests:
+          - not_null
+
+      - name: weekly_rent
+        description: Parsed weekly rent as NUMERIC. NULL if unparseable.
+
+      - name: price_tier
+        description: Investment tier based on weekly rent
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Budget', 'Mid-Range', 'Premium', 'Luxury', 'Unknown']
+
+      - name: property_type
+        description: Lowercased property type
+        tests:
+          - not_null
+
+      - name: locality
+        description: Cleaned locality name. Non-nullable in Silver.
+        tests:
+          - not_null
+
+      - name: has_valid_price
+        description: TRUE if price was successfully parsed
+        tests:
+          - not_null
+
+      - name: has_valid_locality
+        description: TRUE if locality is non-null and non-empty
+        tests:
+          - not_null
+
+  - name: gold_suburb_summary
+    description: >
+      Investment-grade rental summary by suburb.
+      Primary table for analysts evaluating suburb-level yield potential.
+
+    columns:
+      - name: locality
+        description: Suburb/locality name
+        tests:
+          - not_null
+
+      - name: state
+        description: Australian state
+        tests:
+          - not_null
+
+      - name: total_listings
+        description: Number of rental listings in this suburb
+        tests:
+          - not_null
+
+      - name: avg_weekly_rent
+        description: Average weekly rent across all listings
+        tests:
+          - not_null
+
+      - name: market_signal
+        description: Investment signal classification
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values:
+                  - 'High Demand - Premium'
+                  - 'High Demand - Affordable'
+                  - 'Moderate Demand - Premium'
+                  - 'Moderate Demand - Affordable'
+                  - 'Low Demand'
+                  - 'Sparse Market'
+
+      - name: rent_rank_in_state
+        description: Rank by avg rent within state
+        tests:
+          - not_null
+
+  - name: gold_property_type
+    description: Rental breakdown by property type and state.
+
+    columns:
+      - name: property_type
+        description: Property type
+        tests:
+          - not_null
+
+      - name: state
+        description: Australian state
+        tests:
+          - not_null
+
+  - name: gold_state_summary
+    description: National rental overview by Australian state.
+
+    columns:
+      - name: state
+        description: Australian state abbreviation
+        tests:
+          - not_null
+          - unique
+
+      - name: total_listings
+        description: Total listings in state
+        tests:
+          - not_null
+
+      - name: national_rent_rank
+        description: State rank by average weekly rent
+        tests:
+          - not_null
+
+      - name: pct_of_national_market
+        description: Percentage of national listings
+        tests:
+          - not_null

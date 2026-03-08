@@ -1,0 +1,51 @@
+# =============================================================================
+# CRE Platform — dbt Connection Profiles
+#
+# LOCATION: This file must be at ~/.dbt/profiles.yml (dbt default)
+#           OR referenced via --profiles-dir flag when running dbt.
+#
+# SECURITY: ALL credentials use env_var() — zero hardcoded secrets.
+#           dbt reads these from your .env file at runtime.
+#
+# USAGE:
+#   # Run from your project root
+#   dbt debug    # Test connection
+#   dbt run      # Execute all models
+#   dbt test     # Run all tests
+#
+# DOCKER vs LOCAL:
+#   When running dbt LOCALLY (outside Docker):
+#     DBT_POSTGRES_HOST=localhost (default in your .env)
+#   When running dbt INSIDE Docker:
+#     DBT_POSTGRES_HOST=cre_postgres
+# =============================================================================
+
+cre_platform:
+  target: dev
+
+  outputs:
+    dev:
+      type: postgres
+      host:     "{{ env_var('DBT_POSTGRES_HOST', 'localhost') }}"
+      port:     "{{ env_var('DBT_POSTGRES_PORT', '5432') | int }}"
+      dbname:   "{{ env_var('DBT_POSTGRES_DB',   'cre_db') }}"
+      user:     "{{ env_var('DBT_POSTGRES_USER',  'cre_user') }}"
+      password: "{{ env_var('DBT_POSTGRES_PASSWORD') }}"
+      schema:   "{{ env_var('DBT_POSTGRES_SCHEMA', 'gold') }}"
+      threads:  4
+      keepalives_idle: 0
+      connect_timeout: 10
+
+    prod:
+      # Production target — same credentials, more threads
+      # Switch with: dbt run --target prod
+      type: postgres
+      host:     "{{ env_var('DBT_POSTGRES_HOST', 'localhost') }}"
+      port:     "{{ env_var('DBT_POSTGRES_PORT', '5432') | int }}"
+      dbname:   "{{ env_var('DBT_POSTGRES_DB',   'cre_db') }}"
+      user:     "{{ env_var('DBT_POSTGRES_USER',  'cre_user') }}"
+      password: "{{ env_var('DBT_POSTGRES_PASSWORD') }}"
+      schema:   "{{ env_var('DBT_POSTGRES_SCHEMA', 'gold') }}"
+      threads:  8
+      keepalives_idle: 0
+      connect_timeout: 10

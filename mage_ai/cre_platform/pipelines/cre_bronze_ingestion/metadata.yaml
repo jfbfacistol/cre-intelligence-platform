@@ -1,0 +1,83 @@
+# =============================================================================
+# CRE Platform — Mage.ai Pipeline Definition
+# Pipeline: cre_bronze_ingestion
+#
+# This YAML wires the three blocks into an executable DAG:
+#
+#   load_rental_csv  ──►  bronze_quality_checks  ──►  export_to_bronze
+#   (Data Loader)         (Transformer)               (Data Exporter)
+#
+# Mage reads this file to understand block dependencies and execution order.
+# Place this file at: mage_ai/pipelines/cre_bronze_ingestion/metadata.yaml
+# =============================================================================
+
+blocks:
+  - uuid: load_rental_csv
+    type: data_loader
+    language: python
+    # Path is relative to the Mage project root (/home/src/cre_platform/)
+    file_path: data_loaders/load_rental_csv.py
+    downstream_blocks:
+      - bronze_quality_checks
+    upstream_blocks: []
+    all_upstream_blocks_executed: true
+    configuration: {}
+
+  - uuid: bronze_quality_checks
+    type: transformer
+    language: python
+    file_path: transformers/bronze_quality_checks.py
+    downstream_blocks:
+      - export_to_bronze
+    upstream_blocks:
+      - load_rental_csv
+    all_upstream_blocks_executed: true
+    configuration: {}
+
+  - uuid: export_to_bronze
+    type: data_exporter
+    language: python
+    file_path: data_exporters/export_to_bronze.py
+    downstream_blocks: []
+    upstream_blocks:
+      - bronze_quality_checks
+    all_upstream_blocks_executed: true
+    configuration: {}
+
+# =============================================================================
+# Pipeline-level configuration
+# =============================================================================
+name: cre_bronze_ingestion
+type: python
+
+description: >
+  Ingests the Australian Rental Market CSV from /home/src/data/,
+  applies Bronze-layer quality auditing, and loads raw data into
+  the bronze.raw_rentals PostgreSQL table. Configuration-driven
+  via mage_ai/config/schema_config.yml.
+
+# Run at 6 AM daily (adjust timezone as needed)
+# To disable scheduling and run manually only, set is_active: false
+schedules:
+  - name: daily_bronze_refresh
+    schedule_type: time
+    start_time: "2026-01-01 06:00:00"
+    cron: "0 6 * * *"         # Daily at 06:00 UTC
+    status: active             # Set to 'inactive' to pause without deleting
+    settings:
+      timeout: 3600            # 1 hour timeout — fail loudly if stuck
+
+# Retry config — attempt once, then surface the error immediately.
+# In Bronze ingestion, a silent retry on bad data is worse than a loud failure.
+retry_config:
+  retries: 1
+  retry_delay: 30
+  max_retry_delay: 60
+  exponential_backoff: false
+
+# Tags for filtering in the Mage UI
+tags:
+  - bronze
+  - ingestion
+  - rentals
+  - australian_market

@@ -1,0 +1,155 @@
+# =============================================================================
+# CRE Platform — Configuration-Driven Schema Mapping
+#
+# PURPOSE: This file is the single source of truth for how raw CSV columns
+# are mapped, typed, and validated before landing in the Bronze layer.
+#
+# PHILOSOPHY: Ingestion logic reads THIS file — not hardcoded column names.
+# To onboard a new dataset, update this config. Zero code changes required.
+#
+# ADDING A NEW DATASET:
+#   1. Add a new top-level key under `datasets:`
+#   2. Define its source_file, target_table, and columns
+#   3. Re-run the Mage pipeline — it will pick up the new config automatically
+# =============================================================================
+
+datasets:
+
+  australian_rentals:
+
+    # -------------------------------------------------------------------------
+    # Source
+    # -------------------------------------------------------------------------
+    source_file: "australian_rental_market_2026.csv"   # Relative to /home/src/data/
+    encoding: "utf-8"
+    delimiter: ","
+
+    # -------------------------------------------------------------------------
+    # Bronze Target (raw landing zone — no transformation yet)
+    # -------------------------------------------------------------------------
+    bronze_schema: "bronze"
+    bronze_table:  "australian_rentals"
+
+    # How to handle re-runs: truncate+reload (idempotent full refresh)
+    # Options: truncate_and_insert | append | upsert
+    load_strategy: "truncate_and_insert"
+
+    # -------------------------------------------------------------------------
+    # Column Mapping
+    # Each entry maps: csv_column → postgres_column, with type + validation hints
+    # The transformer uses `bronze_type` for gentle coercion (string-safe).
+    # dbt Silver models do the heavy-duty type casting.
+    # -------------------------------------------------------------------------
+    columns:
+
+      - csv_name:     "price_display"
+        target_name:  "price_display_raw"    # Keep the raw string (e.g. "$2,800 / month")
+        bronze_type:  "TEXT"
+        nullable:     true
+        notes:        "Raw price string. Silver dbt model parses to NUMERIC."
+
+      - csv_name:     "propertyType"
+        target_name:  "property_type"
+        bronze_type:  "TEXT"
+        nullable:     true
+        notes:        "e.g. House, Apartment, Unit, Townhouse"
+
+      - csv_name:     "locality"
+        target_name:  "locality"
+        bronze_type:  "TEXT"
+        nullable:     false                  # Mandatory — needed for geo-aggregations
+        notes:        "Suburb / locality name in Australia"
+
+      - csv_name:     "state"
+        target_name:  "state"
+        bronze_type:  "TEXT"
+        nullable:     true
+        notes:        "Australian state abbreviation (NSW, VIC, QLD, etc.)"
+
+      - csv_name:     "postcode"
+        target_name:  "postcode"
+        bronze_type:  "TEXT"                 # Keep as TEXT — leading zeros matter (e.g. 0800 NT)
+        nullable:     true
+
+      - csv_name:     "bedrooms"
+        target_name:  "bedrooms_raw"
+        bronze_type:  "TEXT"
+        nullable:     true
+        notes:        "May contain strings like '3+' or 'Studio'. Silver handles this."
+
+      - csv_name:     "bathrooms"
+        target_name:  "bathrooms_raw"
+        bronze_type:  "TEXT"
+        nullable:     true
+
+      - csv_name:     "parking"
+        target_name:  "parking_raw"
+        bronze_type:  "TEXT"
+        nullable:     true
+
+      - csv_name:     "amenities"
+        target_name:  "amenities_raw"
+        bronze_type:  "TEXT"
+        nullable:     true
+        notes:        "Comma-separated list or JSON-like string. Silver normalises."
+
+      - csv_name:     "description"
+        target_name:  "description_raw"
+        bronze_type:  "TEXT"
+        nullable:     true
+        notes:        "Free-text listing description. Used for NLP in future Gold models."
+
+      - csv_name:     "listedDate"
+        target_name:  "listed_date_raw"
+        bronze_type:  "TEXT"                 # Keep raw — date formats vary wildly
+        nullable:     true
+        notes:        "Silver casts to DATE using multiple format attempts."
+
+      - csv_name:     "agencyName"
+        target_name:  "agency_name"
+        bronze_type:  "TEXT"
+        nullable:     true
+
+      - csv_name:     "url"
+        target_name:  "source_url"
+        bronze_type:  "TEXT"
+        nullable:     true
+
+    # -------------------------------------------------------------------------
+    # Audit Columns — Added by the ingestion pipeline, not in the source CSV
+    # -------------------------------------------------------------------------
+    audit_columns:
+      - name:         "_ingested_at"
+        type:         "TIMESTAMPTZ"
+        value:        "CURRENT_TIMESTAMP"
+        notes:        "UTC timestamp when this row was loaded by Mage"
+
+      - name:         "_source_file"
+        type:         "TEXT"
+        value:        "dynamic"              # Populated by pipeline with actual filename
+        notes:        "Tracks which file version produced this row"
+
+      - name:         "_pipeline_run_id"
+        type:         "TEXT"
+        value:        "dynamic"              # Populated by Mage execution context
+        notes:        "Mage run ID for full pipeline lineage tracing"
+
+    # -------------------------------------------------------------------------
+    # Data Quality Rules (evaluated by the transformer — logged, not rejected)
+    # Bronze philosophy: log issues, never drop rows. Silver filters.
+    # -------------------------------------------------------------------------
+    quality_checks:
+      - rule:         "not_null_locality"
+        column:       "locality"
+        check:        "not_null"
+        action:       "log_warning"          # Options: log_warning | raise_error
+
+      - rule:         "price_not_empty"
+        column:       "price_display_raw"
+        check:        "not_empty_string"
+        action:       "log_warning"
+
+      - rule:         "row_count_minimum"
+        check:        "min_row_count"
+        threshold:    100
+        action:       "raise_error"          # Fail pipeline if suspiciously few rows

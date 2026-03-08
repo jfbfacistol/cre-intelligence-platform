@@ -1,0 +1,38 @@
+# =============================================================================
+# CRE Market Intelligence Platform — Git Exclusion Rules
+# =============================================================================
+
+# --- Secrets & Local Config ---
+.env
+.env.backup
+.env.local
+.venv/
+
+# --- Terraform (Infrastructure as Code) ---
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+*.tfstate.lock.info
+bin/
+terraform.exe
+
+# --- dbt (Analytics Engineering) ---
+# Ignores build artifacts and downloaded packages
+**/target/
+**/dbt_packages/
+**/logs/
+dbt_project/.user.yml
+
+# --- Mage.ai (Orchestration) ---
+# Ignores local file version history and temp files
+mage_ai/.file_versions/
+mage_ai/temp/
+mage_ai/metadata.yaml.lock
+
+# --- Python & System Clutter ---
+**/__pycache__/
+*.py[cod]
+*$py.class
+.DS_Store
+Thumbs.db

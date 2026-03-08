@@ -1,0 +1,44 @@
+# =============================================================================
+# CRE Platform — Mage.ai I/O Configuration
+#
+# This file tells Mage how to connect to external data sources and destinations.
+# It is the standard Mage connection config file — must live at:
+#   mage_ai/io_config.yaml  (host)
+#   /home/src/cre_platform/io_config.yaml  (inside container)
+#
+# CREDENTIALS: All sensitive values use {{ env_var('VAR') }} syntax.
+# Mage resolves these from the environment variables injected by docker-compose
+# or Terraform at container startup — zero hardcoded secrets in this file.
+#
+# PROFILES: We define two profiles:
+#   default  — used automatically by Mage UI blocks
+#   dev      — explicit alias, same values, useful for pipeline overrides
+# =============================================================================
+
+version: 1
+
+default:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL — Primary data warehouse for the CRE platform
+  # Mage Data Loader/Exporter blocks use this when profile is set to "default"
+  # ---------------------------------------------------------------------------
+  POSTGRES_CONNECT_TIMEOUT: 10
+  POSTGRES_DBNAME:   "{{ env_var('POSTGRES_DB') }}"
+  POSTGRES_SCHEMA:   bronze                          # Default landing schema
+  POSTGRES_USER:     "{{ env_var('POSTGRES_USER') }}"
+  POSTGRES_PASSWORD: "{{ env_var('POSTGRES_PASSWORD') }}"
+  POSTGRES_HOST:     "{{ env_var('POSTGRES_HOST') }}" # 'cre_postgres' inside Docker
+  POSTGRES_PORT:     "{{ env_var('POSTGRES_PORT') }}"
+
+dev:
+  # ---------------------------------------------------------------------------
+  # Identical to default — explicit dev profile for pipeline-level overrides
+  # Use this in pipeline blocks by setting profile: "dev"
+  # ---------------------------------------------------------------------------
+  POSTGRES_CONNECT_TIMEOUT: 10
+  POSTGRES_DBNAME:   "{{ env_var('POSTGRES_DB') }}"
+  POSTGRES_SCHEMA:   bronze
+  POSTGRES_USER:     "{{ env_var('POSTGRES_USER') }}"
+  POSTGRES_PASSWORD: "{{ env_var('POSTGRES_PASSWORD') }}"
+  POSTGRES_HOST:     "{{ env_var('POSTGRES_HOST') }}"
+  POSTGRES_PORT:     "{{ env_var('POSTGRES_PORT') }}"

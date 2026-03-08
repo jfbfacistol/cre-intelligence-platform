@@ -1,0 +1,130 @@
+# =============================================================================
+# CRE Market Intelligence Platform — Docker Compose
+#
+# PURPOSE: A docker-compose.yml serves two roles in this project:
+#   1. LOCAL DEV: `docker compose up` — fastest way to spin up the stack
+#      without needing Terraform installed.
+#   2. TERRAFORM PARITY: Mirrors the exact same container config as main.tf
+#      so both paths produce identical environments.
+#
+# USAGE:
+#   cp .env.example .env      # Fill in your credentials
+#   docker compose up -d      # Start all services in background
+#   docker compose logs -f    # Tail logs
+#   docker compose down -v    # Tear down (including volumes)
+# =============================================================================
+
+name: cre-platform
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL 15 — Primary data warehouse
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: cre_postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB}
+      POSTGRES_USER:     ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # UTF-8 encoding handles international suburb/locality names correctly
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8"
+
+    volumes:
+      # Named volume: data persists across `docker compose down` / restarts
+      - postgres_data:/var/lib/postgresql/data
+      # Init script: creates schemas (bronze/silver/gold) on first boot
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+
+    ports:
+      # Expose to host for direct access via DBeaver, psql, dbt
+      - "${POSTGRES_PORT:-5432}:5432"
+
+    networks:
+      - cre_network
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # ---------------------------------------------------------------------------
+  # Mage.ai — Orchestration & Ingestion Engine
+  # ---------------------------------------------------------------------------
+  mage:
+    image: mageai/mageai:latest
+    container_name: cre_mage
+    restart: unless-stopped
+
+    # Mage starts its project on boot; point it to our mounted project dir
+    command: mage start cre_platform
+
+    environment:
+      # Mage project
+      MAGE_PROJECT_NAME: cre_platform
+
+      # --- PostgreSQL connection (resolved by container name on cre_network) ---
+      # Pipelines reference these via os.environ["POSTGRES_HOST"] etc.
+      # Zero hardcoded credentials anywhere in the codebase.
+      POSTGRES_HOST:     cre_postgres       # Docker internal DNS — NOT localhost
+      POSTGRES_PORT:     5432
+      POSTGRES_DB:       ${POSTGRES_DB}
+      POSTGRES_USER:     ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+      # Mage runtime
+      ENV: dev
+
+    volumes:
+      # Mount 1: Mage pipeline definitions & project config
+      - ./mage_ai:/home/src/cre_platform
+
+      # Mount 2: Australian Rental CSV data directory
+      # Container path /home/src/data maps to ./data on your host.
+      # In pipelines, read files from: /home/src/data/your_file.csv
+      - ./data:/home/src/data
+
+    ports:
+      - "${MAGE_PORT:-6789}:6789"
+
+    networks:
+      - cre_network
+
+    depends_on:
+      postgres:
+        # Mage will not start until Postgres passes its health check.
+        # This prevents "connection refused" errors on pipeline boot.
+        condition: service_healthy
+
+# =============================================================================
+# NETWORKS — Isolated bridge network.
+# Services resolve each other by their `container_name` value.
+# e.g. Mage connects to Postgres at host="cre_postgres"
+# =============================================================================
+networks:
+  cre_network:
+    # external: true tells Compose this network was created by Terraform.
+    # Compose will attach to it rather than trying to create it, which
+    # caused the "incorrect label" error.
+    # If running WITHOUT Terraform (Compose-only), comment out external and
+    # uncomment driver: bridge below so Compose creates it itself.
+    external: true
+    name: cre_platform_network
+    # driver: bridge   # ← uncomment this and remove external if Terraform is NOT running
+
+# =============================================================================
+# VOLUMES — Named volumes managed by Docker (survive compose down).
+# Use `docker compose down -v` only when you want to wipe the database.
+# =============================================================================
+volumes:
+  postgres_data:
+    # external: true tells Compose this volume was created by Terraform.
+    # Same fix as the network — Compose attaches to it instead of creating it.
+    # If running WITHOUT Terraform, remove external: true so Compose creates it.
+    external: true
+    name: cre_postgres_data
