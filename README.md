@@ -292,18 +292,23 @@ The trigger is configured in the Mage UI under **Triggers → daily_7am_pht**. W
 ## Key Design Decisions
 
 **Why Terraform instead of just Docker Compose?**
+
 Terraform enforces infrastructure as code with state management. It prevents configuration drift and makes the setup fully reproducible from a single `terraform apply`.
 
 **Why bind mounts for Mage?**
+
 Live editing — changes to pipeline code are reflected immediately without container restarts. Essential for iterative development.
 
 **Why `TRUNCATE + INSERT` for Bronze?**
+
 Full idempotency. Re-running the pipeline on the same source file always produces an identical Bronze table. No phantom duplicates.
 
 **Why dbt for Silver/Gold instead of more Mage blocks?**
+
 Clear separation of concerns. Mage owns orchestration and ingestion; dbt owns transformation and testing. Each tool does what it's best at.
 
 **Why never drop rows in Bronze?**
+
 Bronze is a historical record. Data quality issues are flagged and passed downstream — Silver dbt models decide what to filter. This makes debugging and reprocessing trivial.
 
 ---
@@ -327,4 +332,5 @@ Copy `.env.example` to `.env` and fill in your values. Never commit `.env`.
 ## Author
 
 Jfbfacistol
+
 Infrastructure as Code · Pipeline Orchestration · Medallion Architecture · Analytics Engineering · Data Quality Testing · Pipeline Scheduling
